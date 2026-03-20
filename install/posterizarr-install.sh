@@ -132,6 +132,14 @@ msg_ok "Frontend Built"
 
 # ─── systemd Service — Web UI Backend ────────────────────────────────────────
 msg_info "Creating posterizarr-backend systemd Service"
+# Detect the Python binary — setup.sh may have created a virtualenv
+if [ -f /opt/posterizarr/webui/backend/.venv/bin/python3 ]; then
+  PYTHON_BIN="/opt/posterizarr/webui/backend/.venv/bin/python3"
+elif [ -f /opt/posterizarr/webui/backend/venv/bin/python3 ]; then
+  PYTHON_BIN="/opt/posterizarr/webui/backend/venv/bin/python3"
+else
+  PYTHON_BIN="/usr/bin/python3"
+fi
 cat <<EOF >/etc/systemd/system/posterizarr-backend.service
 [Unit]
 Description=Posterizarr Web UI Backend
@@ -143,7 +151,7 @@ Wants=network-online.target
 Type=simple
 User=root
 WorkingDirectory=/opt/posterizarr/webui/backend
-ExecStart=/usr/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8000
+ExecStart=${PYTHON_BIN} -m uvicorn main:app --host 0.0.0.0 --port 8000
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
@@ -172,7 +180,7 @@ msg_ok "First-run initialization complete (see /var/log/posterizarr-firstrun.log
 msg_info "Installing Scheduled Cron Job (every 2 hours)"
 systemctl enable -q cron
 (crontab -l 2>/dev/null; \
-  echo "0 */2 * * * pwsh /opt/posterizarr/Posterizarr.ps1 >>/var/log/posterizarr.log 2>&1") \
+  echo "0 */2 * * * cd /opt/posterizarr && pwsh Posterizarr.ps1 >>/var/log/posterizarr.log 2>&1") \
   | crontab -
 msg_ok "Cron Job Installed (edit schedule with: crontab -e)"
 

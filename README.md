@@ -9,7 +9,7 @@ Deploys [Posterizarr](https://github.com/fscorrupt/Posterizarr) (automated poste
 | Setting     | Value       |
 |-------------|-------------|
 | OS          | Debian 12   |
-| Disk        | 8 GB        |
+| Disk        | 12 GB       |
 | CPU         | 2 cores     |
 | RAM         | 2048 MB     |
 | Network     | DHCP        |
@@ -20,21 +20,20 @@ Deploys [Posterizarr](https://github.com/fscorrupt/Posterizarr) (automated poste
 
 ## How to Use
 
-### Option A — Host scripts on your own GitHub fork (recommended)
+### Option A — Fork the community-scripts repo (recommended)
 
-1. Fork or push this repo to your GitHub account.
-2. SSH into your Proxmox host.
-3. Run:
+1. Fork [community-scripts/ProxmoxVE](https://github.com/community-scripts/ProxmoxVE).
+2. Copy `ct/posterizarr.sh` and `install/posterizarr-install.sh` into your fork.
+3. In your fork's `ct/posterizarr.sh`, update the `source` URL at the top to point to **your fork**.
+4. SSH into your Proxmox host and run:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/ct/posterizarr.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/ProxmoxVE/main/ct/posterizarr.sh)"
 ```
 
-The script will:
-- Present the interactive mode menu (Default / Advanced / etc.)
-- Create the LXC container
-- Automatically run `install/posterizarr-install.sh` inside the container
-- Print the Web UI URL when done
+> **Note:** The community-scripts `build.func` fetches the install script from the
+> same GitHub repo as `ct/posterizarr.sh`. Both files must live in the same fork
+> for the automated install to work.
 
 ### Option B — Run locally from the Proxmox host
 
@@ -49,11 +48,13 @@ scp install/posterizarr-install.sh root@proxmox:/root/
 bash /root/posterizarr.sh
 ```
 
-### Option C — Use alongside the official community-scripts framework
+### Option C — Submit to the official community-scripts project
 
-If you already have community-scripts set up on your Proxmox host, drop the files into the correct locations:
-- `ct/posterizarr.sh` → `/usr/local/community-scripts/ct/posterizarr.sh`
-- `install/posterizarr-install.sh` → `/usr/local/community-scripts/install/posterizarr-install.sh`
+Open a PR to [community-scripts/ProxmoxVE](https://github.com/community-scripts/ProxmoxVE) with these two files in the correct locations:
+- `ct/posterizarr.sh`
+- `install/posterizarr-install.sh`
+
+Once merged, anyone can install Posterizarr with one command from the community-scripts website.
 
 ---
 

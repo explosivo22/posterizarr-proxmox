@@ -4,6 +4,8 @@
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
 # Source:  https://github.com/fscorrupt/Posterizarr
 
+source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
+
 function header_info {
   clear
   cat <<"EOF"
@@ -24,7 +26,6 @@ var_ram="2048"
 var_os="debian"
 var_version="12"
 var_unprivileged="1"
-var_install="posterizarr"   # maps to install/posterizarr-install.sh inside container
 
 variables
 color
