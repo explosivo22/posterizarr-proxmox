@@ -46,6 +46,8 @@ function update_script() {
     rm -rf /opt/posterizarr
     git clone --depth=1 --branch "${RELEASE}" \
       https://github.com/fscorrupt/Posterizarr.git /opt/posterizarr
+    # Re-create symlink so Posterizarr.ps1 finds config.json in its working directory
+    ln -sf /config/config.json /opt/posterizarr/config.json
     cd /opt/posterizarr/webui && bash setup.sh
     cd /opt/posterizarr/webui/frontend && npm run build
     echo "${RELEASE}" >/opt/posterizarr_version.txt
