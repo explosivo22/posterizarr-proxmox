@@ -46,13 +46,17 @@ msg_info "Compiling ImageMagick 7 from source (takes a few minutes)"
 wget -q "https://imagemagick.org/archive/ImageMagick.tar.gz" -O /tmp/imagemagick.tar.gz
 tar -xzf /tmp/imagemagick.tar.gz -C /tmp
 IM_DIR=$(find /tmp -maxdepth 1 -type d -name "ImageMagick-*" | head -1)
-cd "${IM_DIR}"
+if [[ -z "${IM_DIR}" || ! -d "${IM_DIR}" ]]; then
+  msg_error "Failed to find extracted ImageMagick directory"
+  exit 1
+fi
+cd "${IM_DIR}" || exit 1
 $STD ./configure --with-jpeg=yes --with-png=yes --with-freetype=yes --with-webp=yes
 $STD make -j"$(nproc)"
 $STD make install
 $STD ldconfig /usr/local/lib
 rm -rf /tmp/imagemagick.tar.gz "${IM_DIR}"
-cd /
+cd / || exit 1
 msg_ok "Installed ImageMagick $(magick -version 2>&1 | head -1 | awk '{print $3}')"
 
 # ─── PowerShell 7.x ──────────────────────────────────────────────────────────
@@ -79,6 +83,10 @@ msg_ok "Installed Python $(python3 --version | awk '{print $2}')"
 # ─── FanartTV PowerShell Module ───────────────────────────────────────────────
 msg_info "Installing FanartTV PowerShell Module"
 $STD pwsh -Command "Install-Module -Name FanartTvAPI -Force -Scope AllUsers -Repository PSGallery"
+if ! pwsh -Command "Get-Module -ListAvailable -Name FanartTvAPI" &>/dev/null; then
+  msg_error "FanartTvAPI module failed to install"
+  exit 1
+fi
 msg_ok "Installed FanartTV PowerShell Module"
 
 # Per walkthrough: create the global PS profile and add the import statement so
@@ -96,10 +104,17 @@ msg_ok "PowerShell Profile Configured (${PROFILE_FILE})"
 # Walkthrough uses git clone (not tarball) so the working directory and
 # relative internal paths behave as the developer expects.
 msg_info "Cloning Posterizarr"
-RELEASE=$(curl -fsSL https://api.github.com/repos/fscorrupt/Posterizarr/releases/latest \
-  | grep '"tag_name"' | cut -d'"' -f4)
+RELEASE=$(curl -fsSL https://api.github.com/repos/fscorrupt/Posterizarr/releases/latest | jq -r '.tag_name')
+if [[ -z "${RELEASE}" || "${RELEASE}" == "null" ]]; then
+  msg_error "Failed to fetch latest Posterizarr release tag"
+  exit 1
+fi
 $STD git clone --depth=1 --branch "${RELEASE}" \
   https://github.com/fscorrupt/Posterizarr.git /opt/posterizarr
+if [[ ! -f /opt/posterizarr/Posterizarr.ps1 ]]; then
+  msg_error "Git clone failed — Posterizarr.ps1 not found"
+  exit 1
+fi
 echo "${RELEASE}" >/opt/posterizarr_version.txt
 msg_ok "Cloned Posterizarr ${RELEASE} to /opt/posterizarr"
 
@@ -113,21 +128,33 @@ mkdir -p /config /assets /assetsbackup /manualassets
 if [[ -f /opt/posterizarr/config.example.json && ! -f /config/config.json ]]; then
   cp /opt/posterizarr/config.example.json /config/config.json
   # Set AssetPath to /assets per walkthrough guidance for non-Docker Linux installs
-  sed -i 's|"AssetPath"[[:space:]]*:[[:space:]]*"[^"]*"|"AssetPath": "/assets"|g' /config/config.json
+  jq '.AssetPath = "/assets"' /config/config.json > /tmp/config.json && mv /tmp/config.json /config/config.json
 fi
+chmod 600 /config/config.json 2>/dev/null
 # Symlink so Posterizarr.ps1 finds config.json at its expected relative path
-ln -sf /config/config.json /opt/posterizarr/config.json
+if [[ -f /config/config.json ]]; then
+  ln -sf /config/config.json /opt/posterizarr/config.json
+fi
 msg_ok "Directories Created"
 
 # ─── Web UI Setup ─────────────────────────────────────────────────────────────
 msg_info "Setting Up Web UI Backend (Python)"
-cd /opt/posterizarr/webui
-$STD bash setup.sh
+cd /opt/posterizarr/webui || exit 1
+if [[ -f setup.sh ]]; then
+  $STD bash setup.sh || { msg_error "setup.sh execution failed"; exit 1; }
+else
+  msg_error "webui/setup.sh not found"
+  exit 1
+fi
 msg_ok "Web UI Backend Dependencies Installed"
 
 msg_info "Building Web UI Frontend (Node.js)"
-cd /opt/posterizarr/webui/frontend
+cd /opt/posterizarr/webui/frontend || exit 1
 $STD npm run build
+if [[ ! -d /opt/posterizarr/webui/frontend/build && ! -d /opt/posterizarr/webui/frontend/dist ]]; then
+  msg_error "Frontend build failed — no build or dist directory found"
+  exit 1
+fi
 msg_ok "Frontend Built"
 
 # ─── systemd Service — Web UI Backend ────────────────────────────────────────
@@ -170,15 +197,19 @@ msg_ok "Posterizarr Backend Service Started"
 # Per walkthrough: the script must be run once as root/sudo before scheduled use
 # because on first run it installs additional PowerShell components itself.
 msg_info "Running Posterizarr.ps1 first-time initialization"
-cd /opt/posterizarr
-pwsh Posterizarr.ps1 -Testing >/var/log/posterizarr-firstrun.log 2>&1 || true
-msg_ok "First-run initialization complete (see /var/log/posterizarr-firstrun.log)"
+cd /opt/posterizarr || exit 1
+if ! pwsh Posterizarr.ps1 -Testing >/var/log/posterizarr-firstrun.log 2>&1; then
+  msg_warn "First-run exited with errors (this may be normal without API keys configured)"
+  msg_warn "Review /var/log/posterizarr-firstrun.log for details"
+fi
+msg_ok "First-run initialization complete"
 
 # ─── Cron — Scheduled Poster Generation ──────────────────────────────────────
 # Per walkthrough: on non-Docker installs, scheduling is done via cron.
 # Default: every 2 hours. User can edit with: crontab -e
 msg_info "Installing Scheduled Cron Job (every 2 hours)"
 systemctl enable -q cron
+touch /var/log/posterizarr.log
 (crontab -l 2>/dev/null; \
   echo "0 */2 * * * cd /opt/posterizarr && pwsh Posterizarr.ps1 >>/var/log/posterizarr.log 2>&1") \
   | crontab -

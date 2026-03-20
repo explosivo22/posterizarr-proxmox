@@ -39,18 +39,30 @@ function update_script() {
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-  RELEASE=$(curl -fsSL https://api.github.com/repos/fscorrupt/Posterizarr/releases/latest \
-    | grep '"tag_name"' | cut -d'"' -f4)
+  RELEASE=$(curl -fsSL https://api.github.com/repos/fscorrupt/Posterizarr/releases/latest | jq -r '.tag_name')
+  if [[ -z "${RELEASE}" || "${RELEASE}" == "null" ]]; then
+    msg_error "Failed to fetch latest release tag"
+    exit
+  fi
   if [[ "${RELEASE}" != "$(cat /opt/posterizarr_version.txt)" ]]; then
     msg_info "Updating ${APP} to ${RELEASE}"
     systemctl stop posterizarr-backend
     rm -rf /opt/posterizarr
     git clone --depth=1 --branch "${RELEASE}" \
       https://github.com/fscorrupt/Posterizarr.git /opt/posterizarr
+    if [[ ! -f /opt/posterizarr/Posterizarr.ps1 ]]; then
+      msg_error "Git clone failed during update"
+      systemctl start posterizarr-backend
+      exit
+    fi
     # Re-create symlink so Posterizarr.ps1 finds config.json in its working directory
-    ln -sf /config/config.json /opt/posterizarr/config.json
-    cd /opt/posterizarr/webui && bash setup.sh
-    cd /opt/posterizarr/webui/frontend && npm run build
+    if [[ -f /config/config.json ]]; then
+      ln -sf /config/config.json /opt/posterizarr/config.json
+    fi
+    cd /opt/posterizarr/webui || exit
+    bash setup.sh || { msg_error "setup.sh failed"; exit; }
+    cd /opt/posterizarr/webui/frontend || exit
+    npm run build || { msg_error "npm build failed"; exit; }
     echo "${RELEASE}" >/opt/posterizarr_version.txt
     systemctl start posterizarr-backend
     msg_ok "Updated ${APP} to ${RELEASE}"

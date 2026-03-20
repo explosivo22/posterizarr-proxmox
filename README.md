@@ -134,4 +134,23 @@ journalctl -u posterizarr-backend -f
 
 # Service status
 systemctl status posterizarr-backend
+
+# Cron job logs
+tail -f /var/log/posterizarr.log
+
+# First-run log
+cat /var/log/posterizarr-firstrun.log
 ```
+
+---
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| Web UI not loading | `systemctl status posterizarr-backend` — check if running |
+| Port 8000 unreachable | Verify container IP with `ip a`; ensure firewall allows TCP 8000 |
+| Posters not generating | Check API keys in `/config/config.json`; run manual test: `pwsh /opt/posterizarr/Posterizarr.ps1 -Testing` |
+| ImageMagick errors | Verify: `magick -version` should show 7.x |
+| PowerShell module missing | Reinstall: `pwsh -Command "Install-Module -Name FanartTvAPI -Force -Scope AllUsers"` |
+| Cron not running | `systemctl status cron` + verify entries with `crontab -l` |
