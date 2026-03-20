@@ -18,7 +18,7 @@ EOF
 header_info
 echo -e "Loading..."
 APP="Posterizarr"
-var_disk="8"
+var_disk="12"
 var_cpu="2"
 var_ram="2048"
 var_os="debian"
@@ -44,9 +44,8 @@ function update_script() {
     msg_info "Updating ${APP} to ${RELEASE}"
     systemctl stop posterizarr-backend
     rm -rf /opt/posterizarr
-    mkdir -p /opt/posterizarr
-    curl -fsSL "https://github.com/fscorrupt/Posterizarr/archive/refs/tags/${RELEASE}.tar.gz" \
-      | tar -xz --strip-components=1 -C /opt/posterizarr
+    git clone --depth=1 --branch "${RELEASE}" \
+      https://github.com/fscorrupt/Posterizarr.git /opt/posterizarr
     cd /opt/posterizarr/webui && bash setup.sh
     cd /opt/posterizarr/webui/frontend && npm run build
     echo "${RELEASE}" >/opt/posterizarr_version.txt
